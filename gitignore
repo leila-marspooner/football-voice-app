@@ -1,0 +1,58 @@
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pdb
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+.venv/
+venv/
+env/
+ENV/
+env.bak/
+*.sqlite3
+db.sqlite3
+
+# Virtual environment
+*.env
+.env.local
+.env.production
+.env.development
+
+# ---- Node / React Native ----
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+expo-debug.log*
+.expo/
+.expo-shared/
+*.expo*
+*.keystore
+*.gradle
+*.iml
+.idea/
+.android/
+.ios/
+Pods/
+
+# React Native cache
+*.packager
+*.hprof
+
+# Metro bundler cache
+.expo/
+.expo-shared/
+.expo-cli/
+metro-cache/
+
+# macOS
+.DS_Store
+
+# ---- Docker ----
+/docker-data
+docker-compose.override.yml
