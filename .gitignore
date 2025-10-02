@@ -9,19 +9,23 @@ __pycache__/
 dist/
 build/
 .eggs/
+
+# Virtual environments
 .venv/
 venv/
 env/
 ENV/
 env.bak/
+backend/venv/
+
+# SQLite (if used locally)
 *.sqlite3
 db.sqlite3
 
-# Virtual environment
+# ---- Env / Secrets ----
+.env
+.env.*
 *.env
-.env.local
-.env.production
-.env.development
 
 # ---- Node / React Native ----
 node_modules/
@@ -45,13 +49,14 @@ Pods/
 *.hprof
 
 # Metro bundler cache
-.expo/
-.expo-shared/
 .expo-cli/
 metro-cache/
 
-# macOS
+# ---- macOS ----
 .DS_Store
+
+# ---- Editor ----
+.vscode/
 
 # ---- Docker ----
 /docker-data
