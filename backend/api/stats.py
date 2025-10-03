@@ -1,58 +1,34 @@
-from datetime import datetime
-
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, func
 
 from ..db import get_session
-from ..models import Player, StatsCache
-from ..schemas import PlayerStats
+from ..models import Player, Event
+from ..schemas import PlayerStatsOut
+
+router = APIRouter(tags=["Stats"])
 
 
-router = APIRouter()
-
-
-@router.get("/players/{player_id}/stats", response_model=PlayerStats)
-async def get_player_stats(
-    player_id: int,
-    match_id: int | None = None,
-    session: AsyncSession = Depends(get_session),
-):
+@router.get("/players/{player_id}/stats", response_model=PlayerStatsOut)
+async def get_player_stats(player_id: int, session: AsyncSession = Depends(get_session)):
+    # validate player
     player = await session.get(Player, player_id)
     if not player:
         raise HTTPException(status_code=404, detail="Player not found")
 
-    # Try cache first
-    stmt = select(StatsCache).where(StatsCache.player_id == player_id)
-    if match_id is not None:
-        stmt = stmt.where(StatsCache.match_id == match_id)
-    result = await session.execute(stmt)
-    cached = result.scalars().first()
-    if cached:
-        return PlayerStats(
-            player_id=player_id,
-            match_id=match_id,
-            stats=cached.stat_json,
-            computed_at=cached.computed_at,
-        )
-
-    # Minimal placeholder stats; in a real system compute from events
-    stats_data = {"goals": 0, "assists": 0}
-
-    cache = StatsCache(
-        player_id=player_id,
-        match_id=match_id,
-        stat_json=stats_data,
-        computed_at=datetime.utcnow(),
-    )
-    session.add(cache)
-    await session.commit()
-
-    return PlayerStats(
-        player_id=player_id,
-        match_id=match_id,
-        stats=stats_data,
-        computed_at=cache.computed_at,
+    # aggregate events for this player
+    result = await session.execute(
+        select(Event.event_type, func.count())
+        .where(Event.player_id == player_id)
+        .group_by(Event.event_type)
     )
 
+    rows = result.all()
+    stats = {event_type: count for event_type, count in rows}
 
+    return PlayerStatsOut(
+        player_id=player.id,
+        player_name=player.name,
+        team_id=player.team_id,
+        stats=stats,
+    )

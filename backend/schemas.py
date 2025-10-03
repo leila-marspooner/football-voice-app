@@ -1,9 +1,9 @@
 from datetime import datetime
-from typing import Optional
-
+from typing import Optional, List, Dict   # <-- add Dict here
 from pydantic import BaseModel, Field
 
 
+# ----------- CLUBS -----------
 class ClubIn(BaseModel):
     name: str
 
@@ -13,7 +13,11 @@ class ClubOut(BaseModel):
     name: str
     created_at: datetime
 
+    class Config:
+        orm_mode = True
 
+
+# ----------- TEAMS -----------
 class TeamIn(BaseModel):
     club_id: int
     name: str
@@ -27,7 +31,11 @@ class TeamOut(BaseModel):
     age_group: Optional[str] = None
     created_at: datetime
 
+    class Config:
+        orm_mode = True
 
+
+# ----------- COACHES -----------
 class CoachIn(BaseModel):
     team_id: int
     name: str
@@ -41,7 +49,11 @@ class CoachOut(BaseModel):
     role: Optional[str] = None
     created_at: datetime
 
+    class Config:
+        orm_mode = True
 
+
+# ----------- PLAYERS -----------
 class PlayerIn(BaseModel):
     team_id: int
     name: str
@@ -55,7 +67,11 @@ class PlayerOut(BaseModel):
     position: Optional[str] = None
     created_at: datetime
 
+    class Config:
+        orm_mode = True
 
+
+# ----------- MATCHES -----------
 class MatchIn(BaseModel):
     team_id: int
     opponent_name: str
@@ -73,7 +89,11 @@ class MatchOut(BaseModel):
     venue: Optional[str] = None
     created_at: datetime
 
+    class Config:
+        orm_mode = True
 
+
+# ----------- LINEUPS -----------
 class LineupIn(BaseModel):
     player_id: int
     position: Optional[str] = None
@@ -88,14 +108,20 @@ class LineupOut(BaseModel):
     is_starter: bool
     created_at: datetime
 
+    class Config:
+        orm_mode = True
 
+
+# ----------- EVENTS -----------
 class EventIn(BaseModel):
+    match_id: int                     # <-- add this
     minute: int = Field(ge=0)
     event_type: str
     team_context: str = Field(default="us")
     player_id: Optional[int] = None
     raw_text: Optional[str] = None
     meta_json: Optional[dict] = None
+
 
 
 class RawTextIn(BaseModel):
@@ -112,13 +138,20 @@ class EventOut(BaseModel):
     raw_text: Optional[str] = None
     meta_json: Optional[dict] = None
 
+    class Config:
+        orm_mode = True
 
+
+# ----------- SUMMARIES & STATS -----------
 class MatchSummary(BaseModel):
     id: int
     team_id: int
     opponent_name: str
     kickoff_at: datetime
     num_events: int
+
+    class Config:
+        orm_mode = True
 
 
 class PlayerStats(BaseModel):
@@ -127,4 +160,11 @@ class PlayerStats(BaseModel):
     stats: dict
     computed_at: datetime
 
+    class Config:
+        orm_mode = True
 
+class PlayerStatsOut(BaseModel):
+    player_id: int
+    player_name: str
+    team_id: int
+    stats: Dict[str, int]
