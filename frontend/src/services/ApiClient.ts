@@ -51,7 +51,38 @@ export interface PlayerStats {
   duel_win_rate: number;
 }
 
-const API_BASE_URL = 'http://localhost:8000'; // Adjust this to match your backend URL
+export const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.1.xx:8000';
+
+// Helper function to log full error details when fetch fails
+const logError = async (response: Response, operation: string, url?: string): Promise<void> => {
+  console.error(`❌ ${operation} failed with status:`, response.status);
+  if (url) {
+    console.error(`❌ URL called:`, url);
+  }
+  console.error(`❌ Response headers:`, Object.fromEntries(response.headers.entries()));
+  
+  try {
+    const errorText = await response.text();
+    console.error(`❌ Response body:`, errorText);
+  } catch (e) {
+    console.error(`❌ Could not read response body:`, e);
+  }
+};
+
+// Helper function to handle fetch errors with clear messages
+const handleFetchError = (error: any, operation: string): never => {
+  console.error(`❌ ${operation} failed:`, error);
+  
+  if (error instanceof TypeError && error.message.includes('fetch')) {
+    throw new Error(`Network error: Unable to connect to server. Please check your connection.`);
+  }
+  
+  if (error.message) {
+    throw new Error(`${operation} failed: ${error.message}`);
+  }
+  
+  throw new Error(`${operation} failed: Unknown error occurred`);
+};
 
 export async function sendRawEvent(matchId: number, rawText: string): Promise<ParsedEvent> {
   const url = `${API_BASE_URL}/matches/${matchId}/events/raw`;
@@ -70,14 +101,14 @@ export async function sendRawEvent(matchId: number, rawText: string): Promise<Pa
     });
 
     if (!response.ok) {
+      await logError(response, 'Sending raw event', url);
       throw new Error(`HTTP error! status: ${response.status}`);
     }
 
     const parsedEvent: ParsedEvent = await response.json();
     return parsedEvent;
   } catch (error) {
-    console.error('Error sending raw event:', error);
-    throw error;
+    handleFetchError(error, 'Sending raw event');
   }
 }
 
@@ -93,14 +124,14 @@ export async function getMatch(matchId: number): Promise<Match> {
     });
 
     if (!response.ok) {
+      await logError(response, 'Fetching match', url);
       throw new Error(`HTTP error! status: ${response.status}`);
     }
 
     const match: Match = await response.json();
     return match;
   } catch (error) {
-    console.error('Error fetching match:', error);
-    throw error;
+    handleFetchError(error, 'Fetching match');
   }
 }
 
@@ -116,11 +147,11 @@ export async function deleteEvent(eventId: number): Promise<void> {
     });
 
     if (!response.ok) {
+      await logError(response, 'Deleting event', url);
       throw new Error(`HTTP error! status: ${response.status}`);
     }
   } catch (error) {
-    console.error('Error deleting event:', error);
-    throw error;
+    handleFetchError(error, 'Deleting event');
   }
 }
 
@@ -137,14 +168,14 @@ export async function updateEvent(eventId: number, updates: UpdateEventPayload):
     });
 
     if (!response.ok) {
+      await logError(response, 'Updating event', url);
       throw new Error(`HTTP error! status: ${response.status}`);
     }
 
     const updatedEvent: ParsedEvent = await response.json();
     return updatedEvent;
   } catch (error) {
-    console.error('Error updating event:', error);
-    throw error;
+    handleFetchError(error, 'Updating event');
   }
 }
 
@@ -160,13 +191,13 @@ export async function getPlayerStats(playerId: number): Promise<PlayerStats> {
     });
 
     if (!response.ok) {
+      await logError(response, 'Fetching player stats', url);
       throw new Error(`HTTP error! status: ${response.status}`);
     }
 
     const playerStats: PlayerStats = await response.json();
     return playerStats;
   } catch (error) {
-    console.error('Error fetching player stats:', error);
-    throw error;
+    handleFetchError(error, 'Fetching player stats');
   }
 }

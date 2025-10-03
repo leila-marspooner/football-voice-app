@@ -13,98 +13,137 @@ router = APIRouter()
 async def reset(session: AsyncSession = Depends(get_session)):
     """
     ⚠️ DEVELOPMENT ONLY:
-    Truncate all tables (except alembic_version).
-    Wipes out all data so you can reseed clean.
+    Delete all rows from events, matches, players, teams, and clubs tables.
+    Then automatically repopulate with demo data.
     """
-    tables = [
-        "lineups",
+    from datetime import datetime
+
+    # Delete in the right order for foreign keys (child tables first)
+    tables_to_delete = [
         "events",
-        "raw_events",
-        "stats_cache",
+        "matches", 
         "players",
-        "coaches",
-        "matches",
         "teams",
-        "clubs",
+        "clubs"
     ]
-    for table in tables:
-        await session.execute(text(f"TRUNCATE {table} RESTART IDENTITY CASCADE;"))
+    
+    for table in tables_to_delete:
+        await session.execute(text(f"DELETE FROM {table};"))
+    
+    # Commit deletions
     await session.commit()
-    return {"status": "reset complete"}
+
+    # Now repopulate with demo data (same logic as /seed)
+    # --- Club ---
+    club = models.Club(name="Winchester FC")
+    session.add(club)
+    await session.flush()  # Get club ID
+
+    # --- Team ---
+    team = models.Team(
+        club_id=club.id,
+        name="U9 Reds",
+        age_group="U9"
+    )
+    session.add(team)
+    await session.flush()  # Get team ID
+
+    # --- Players ---
+    players_data = [
+        ("Winston", "Striker"),
+        ("Tommy", "Keeper"),
+        ("Logan", "Defence"),
+    ]
+    players = []
+    for name, position in players_data:
+        player = models.Player(
+            team_id=team.id,
+            name=name,
+            position=position
+        )
+        session.add(player)
+        await session.flush()  # Get player ID
+        players.append(player)
+
+    # --- Match ---
+    match = models.Match(
+        team_id=team.id,
+        opponent_name="Stoneham FC",
+        kickoff_at=datetime.fromisoformat("2025-10-04T10:00:00Z"),  # 2025-10-04T10:00:00Z
+        competition="League",
+        venue="Home Ground"
+    )
+    session.add(match)
+    await session.flush()  # Get match ID
+
+    # Commit all changes before returning
+    await session.commit()
+
+    return {
+        "status": "ok",
+        "match_id": match.id,
+        "player_ids": [player.id for player in players]
+    }
 
 
 @router.post("/seed")
 async def seed(session: AsyncSession = Depends(get_session)):
     """
-    Seed initial test data:
-    - Clubs: Winchester City FC, Littleton FC, Stoneham FC
-    - Teams: Reds (U9), Thunderchiefs (U9), Panthers (U9)
-    - Players: 7 players in Reds
-    Safe to re-run: won't create duplicates.
+    Seed demo data:
+    - 1 club (Winchester FC)
+    - 1 team (U9 Reds) linked to the club
+    - 3 players (Winston, Tommy, Logan) linked to the team
+    - 1 match vs Stoneham FC with kickoff date/time, competition = League, venue = Home Ground
     """
+    from datetime import datetime
 
-    # --- Clubs ---
-    clubs_data = ["Winchester City FC", "Littleton FC", "Stoneham FC"]
-    clubs = {}
-    for name in clubs_data:
-        result = await session.execute(select(models.Club).where(models.Club.name == name))
-        club = result.scalars().first()
-        if not club:
-            club = models.Club(name=name)
-            session.add(club)
-            await session.flush()
-        clubs[name] = club
+    # --- Club ---
+    club = models.Club(name="Winchester FC")
+    session.add(club)
+    await session.flush()  # Get club ID
 
-    # --- Teams ---
-    teams_data = {
-        "Winchester City FC": ("Reds", "U9"),
-        "Littleton FC": ("Thunderchiefs", "U9"),
-        "Stoneham FC": ("Panthers", "U9"),
-    }
-    teams = {}
-    for club_name, (team_name, age_group) in teams_data.items():
-        result = await session.execute(
-            select(models.Team).where(
-                models.Team.name == team_name, models.Team.club_id == clubs[club_name].id
-            )
-        )
-        team = result.scalars().first()
-        if not team:
-            team = models.Team(
-                club_id=clubs[club_name].id, name=team_name, age_group=age_group
-            )
-            session.add(team)
-            await session.flush()
-        teams[team_name] = team
+    # --- Team ---
+    team = models.Team(
+        club_id=club.id,
+        name="U9 Reds",
+        age_group="U9"
+    )
+    session.add(team)
+    await session.flush()  # Get team ID
 
-    # --- Players (only for Winchester Reds) ---
+    # --- Players ---
     players_data = [
         ("Winston", "Striker"),
         ("Tommy", "Keeper"),
-        ("Tom", "Midfield"),
-        ("Kip", "Defence"),
-        ("Leo", "Winger"),
-        ("Alex", "Midfield"),
         ("Logan", "Defence"),
     ]
     players = []
     for name, position in players_data:
-        result = await session.execute(
-            select(models.Player).where(
-                models.Player.name == name, models.Player.team_id == teams["Reds"].id
-            )
+        player = models.Player(
+            team_id=team.id,
+            name=name,
+            position=position
         )
-        player = result.scalars().first()
-        if not player:
-            player = models.Player(team_id=teams["Reds"].id, name=name, position=position)
-            session.add(player)
-            await session.flush()
+        session.add(player)
+        await session.flush()  # Get player ID
         players.append(player)
 
+    # --- Match ---
+    match = models.Match(
+        team_id=team.id,
+        opponent_name="Stoneham FC",
+        kickoff_at=datetime.fromisoformat("2025-10-04T10:00:00Z"),  # 2025-10-04T10:00:00Z
+        competition="League",
+        venue="Home Ground"
+    )
+    session.add(match)
+    await session.flush()  # Get match ID
+
+    # Commit all changes before returning
     await session.commit()
 
     return {
-        "clubs": {name: club.id for name, club in clubs.items()},
-        "teams": {name: team.id for name, team in teams.items()},
-        "players": [p.name for p in players],
+        "status": "ok",
+        "match_id": match.id,
+        "player_ids": [player.id for player in players]
     }

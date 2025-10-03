@@ -121,31 +121,45 @@ async def transcribe_audio(file: UploadFile = File(...)) -> JSONResponse:
         
         logger.info(f"Audio file saved to temporary location: {temp_file_path}")
         
-        # Load Whisper model
-        model = get_whisper_model()
-        
-        # Transcribe audio
-        logger.info("Starting transcription...")
-        result = model.transcribe(temp_file_path)
-        
-        transcript = result["text"].strip()
-        
-        if not transcript:
-            logger.warning("Transcription returned empty result")
-            transcript = "[No speech detected]"
-        
-        logger.info(f"Transcription completed: '{transcript[:100]}{'...' if len(transcript) > 100 else ''}'")
-        
-        # Return successful response
-        return JSONResponse(
-            status_code=status.HTTP_200_OK,
-            content={
-                "transcript": transcript,
-                "confidence": getattr(result, "confidence", None),
-                "duration": getattr(result, "duration", None),
-                "language": getattr(result, "language", None)
-            }
-        )
+        # Load Whisper model and transcribe audio
+        try:
+            model = get_whisper_model()
+            
+            # Transcribe audio
+            logger.info("Starting transcription...")
+            result = model.transcribe(temp_file_path)
+            
+            transcript = result["text"].strip()
+            
+            if not transcript:
+                logger.warning("Transcription returned empty result")
+                transcript = "[No speech detected]"
+            
+            logger.info(f"Transcription completed: '{transcript[:100]}{'...' if len(transcript) > 100 else ''}'")
+            
+            # Return successful response
+            return JSONResponse(
+                status_code=status.HTTP_200_OK,
+                content={
+                    "transcript": transcript,
+                    "confidence": getattr(result, "confidence", None),
+                    "duration": getattr(result, "duration", None),
+                    "language": getattr(result, "language", None)
+                }
+            )
+            
+        except Exception as transcription_error:
+            # Log full traceback for transcription errors
+            import traceback
+            logger.error(f"Transcription failed with full traceback:")
+            logger.error(traceback.format_exc())
+            logger.error(f"Transcription error details: {str(transcription_error)}")
+            
+            # Return JSON error response
+            return JSONResponse(
+                status_code=500,
+                content={"error": str(transcription_error)}
+            )
         
     except HTTPException:
         # Re-raise HTTP exceptions as-is

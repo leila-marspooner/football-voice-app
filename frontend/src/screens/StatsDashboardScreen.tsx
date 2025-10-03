@@ -9,15 +9,21 @@ import {
   Alert,
   TouchableOpacity,
 } from 'react-native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { RouteProp } from '@react-navigation/native';
+import { RootStackParamList } from '../navigation/AppNavigator';
 import { getPlayerStats, PlayerStats } from '../services/ApiClient';
 
+type StatsDashboardScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'StatsDashboard'>;
+type StatsDashboardScreenRouteProp = RouteProp<RootStackParamList, 'StatsDashboard'>;
+
 interface StatsDashboardScreenProps {
-  playerIds?: number[]; // Optional array of player IDs, if not provided, will use a default
+  navigation: StatsDashboardScreenNavigationProp;
+  route: StatsDashboardScreenRouteProp;
 }
 
-const StatsDashboardScreen: React.FC<StatsDashboardScreenProps> = ({ 
-  playerIds = [1, 2, 3] // Default player IDs for demo
-}) => {
+const StatsDashboardScreen: React.FC<StatsDashboardScreenProps> = ({ navigation, route }) => {
+  const playerIds = route.params.playerIds || [1, 2, 3]; // Default player IDs for demo
   const [playerStats, setPlayerStats] = useState<PlayerStats[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -45,6 +51,14 @@ const StatsDashboardScreen: React.FC<StatsDashboardScreenProps> = ({
     }
   };
 
+  // Helper function to safely format stats
+  const formatStat = (value: number | undefined, isPercentage: boolean = false): string => {
+    if (value === undefined || value === null || isNaN(value)) {
+      return isPercentage ? 'N/A' : '0';
+    }
+    return isPercentage ? `${value.toFixed(1)}%` : value.toString();
+  };
+
   const renderStatCard = ({ item }: { item: PlayerStats }) => (
     <View style={styles.playerCard}>
       <Text style={styles.playerName}>{item.player_name}</Text>
@@ -54,19 +68,19 @@ const StatsDashboardScreen: React.FC<StatsDashboardScreenProps> = ({
         <Text style={styles.sectionTitle}>Attacking</Text>
         <View style={styles.statRow}>
           <Text style={styles.statLabel}>Goals:</Text>
-          <Text style={styles.statValue}>{item.goals}</Text>
+          <Text style={styles.statValue}>{formatStat(item.goals)}</Text>
         </View>
         <View style={styles.statRow}>
           <Text style={styles.statLabel}>Assists:</Text>
-          <Text style={styles.statValue}>{item.assists}</Text>
+          <Text style={styles.statValue}>{formatStat(item.assists)}</Text>
         </View>
         <View style={styles.statRow}>
           <Text style={styles.statLabel}>Shots on Target:</Text>
-          <Text style={styles.statValue}>{item.shots_on_target}</Text>
+          <Text style={styles.statValue}>{formatStat(item.shots_on_target)}</Text>
         </View>
         <View style={styles.statRow}>
           <Text style={styles.statLabel}>Shot Accuracy:</Text>
-          <Text style={styles.statValue}>{item.shot_accuracy.toFixed(1)}%</Text>
+          <Text style={styles.statValue}>{formatStat(item.shot_accuracy, true)}</Text>
         </View>
       </View>
 
@@ -75,11 +89,11 @@ const StatsDashboardScreen: React.FC<StatsDashboardScreenProps> = ({
         <Text style={styles.sectionTitle}>Passing</Text>
         <View style={styles.statRow}>
           <Text style={styles.statLabel}>Passes Completed:</Text>
-          <Text style={styles.statValue}>{item.passes_completed}</Text>
+          <Text style={styles.statValue}>{formatStat(item.passes_completed)}</Text>
         </View>
         <View style={styles.statRow}>
           <Text style={styles.statLabel}>Pass Accuracy:</Text>
-          <Text style={styles.statValue}>{item.pass_accuracy.toFixed(1)}%</Text>
+          <Text style={styles.statValue}>{formatStat(item.pass_accuracy, true)}</Text>
         </View>
       </View>
 
@@ -88,15 +102,15 @@ const StatsDashboardScreen: React.FC<StatsDashboardScreenProps> = ({
         <Text style={styles.sectionTitle}>Defensive</Text>
         <View style={styles.statRow}>
           <Text style={styles.statLabel}>Tackles:</Text>
-          <Text style={styles.statValue}>{item.tackles}</Text>
+          <Text style={styles.statValue}>{formatStat(item.tackles)}</Text>
         </View>
         <View style={styles.statRow}>
           <Text style={styles.statLabel}>Duels Won:</Text>
-          <Text style={styles.statValue}>{item.duels_won}/{item.duels_total}</Text>
+          <Text style={styles.statValue}>{formatStat(item.duels_won)}/{formatStat(item.duels_total)}</Text>
         </View>
         <View style={styles.statRow}>
           <Text style={styles.statLabel}>Duel Win Rate:</Text>
-          <Text style={styles.statValue}>{item.duel_win_rate.toFixed(1)}%</Text>
+          <Text style={styles.statValue}>{formatStat(item.duel_win_rate, true)}</Text>
         </View>
       </View>
 
@@ -105,19 +119,19 @@ const StatsDashboardScreen: React.FC<StatsDashboardScreenProps> = ({
         <Text style={styles.sectionTitle}>Discipline & Time</Text>
         <View style={styles.statRow}>
           <Text style={styles.statLabel}>Yellow Cards:</Text>
-          <Text style={styles.statValue}>{item.yellow_cards}</Text>
+          <Text style={styles.statValue}>{formatStat(item.yellow_cards)}</Text>
         </View>
         <View style={styles.statRow}>
           <Text style={styles.statLabel}>Red Cards:</Text>
-          <Text style={styles.statValue}>{item.red_cards}</Text>
+          <Text style={styles.statValue}>{formatStat(item.red_cards)}</Text>
         </View>
         <View style={styles.statRow}>
           <Text style={styles.statLabel}>Matches Played:</Text>
-          <Text style={styles.statValue}>{item.matches_played}</Text>
+          <Text style={styles.statValue}>{formatStat(item.matches_played)}</Text>
         </View>
         <View style={styles.statRow}>
           <Text style={styles.statLabel}>Minutes Played:</Text>
-          <Text style={styles.statValue}>{item.minutes_played}</Text>
+          <Text style={styles.statValue}>{formatStat(item.minutes_played)}</Text>
         </View>
       </View>
     </View>

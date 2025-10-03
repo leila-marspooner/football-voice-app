@@ -2,6 +2,27 @@
 
 const API_BASE_URL = 'http://localhost:8000'; // Adjust this to match your backend URL
 
+// Helper function to add timeout to fetch requests
+const fetchWithTimeout = async (url: string, options: RequestInit, timeoutMs: number = 30000): Promise<Response> => {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+    return response;
+  } catch (error) {
+    clearTimeout(timeoutId);
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error(`Request timeout after ${timeoutMs}ms`);
+    }
+    throw error;
+  }
+};
+
 export interface TranscriptionResponse {
   transcript: string;
   confidence?: number;
@@ -17,31 +38,43 @@ export async function transcribeAudio(filePath: string): Promise<string> {
   try {
     console.log(`🎤 Starting transcription for: ${filePath}`);
     
+    // Validate file path before creating FormData
+    if (!filePath || filePath.trim() === '') {
+      throw new Error('No recording file URI found');
+    }
+    
+    console.log(`📁 Validating file path: ${filePath}`);
+    
     // Create FormData for multipart/form-data upload
     const formData = new FormData();
     
-    // Read the file and append to FormData
-    // Note: In React Native, we need to create a file object with proper structure
-    const file = {
+    // Append file with proper structure for React Native
+    formData.append("file", {
       uri: filePath,
-      type: 'audio/m4a', // Adjust based on your audio format
-      name: `audio_${Date.now()}.m4a`,
-    } as any;
+      name: "recording.m4a",
+      type: "audio/m4a"
+    } as any);
     
-    formData.append('file', file);
-    
-    // Make POST request to backend transcription endpoint
-    const response = await fetch(`${API_BASE_URL}/transcribe`, {
+    // Make POST request to backend transcription endpoint with timeout
+    const response = await fetchWithTimeout(`${API_BASE_URL}/transcribe`, {
       method: 'POST',
       headers: {
         'Content-Type': 'multipart/form-data',
       },
       body: formData,
-    });
+    }, 60000); // 60 second timeout for audio processing
     
     if (!response.ok) {
       const errorText = await response.text();
       console.error(`❌ Transcription failed with status ${response.status}:`, errorText);
+      console.error(`❌ Response headers:`, Object.fromEntries(response.headers.entries()));
+      console.error(`❌ Full response body:`, errorText);
+      
+      // Only throw error for backend/server errors (4xx, 5xx)
+      if (response.status >= 400) {
+        throw new Error(`Backend error: ${response.status} - ${errorText || response.statusText}`);
+      }
+      
       throw new Error(`Transcription failed: ${response.status} ${response.statusText}`);
     }
     
@@ -79,13 +112,12 @@ export async function transcribeAudioWithMetadata(filePath: string): Promise<Tra
     
     const formData = new FormData();
     
-    const file = {
+    // Append file with proper structure for React Native
+    formData.append("file", {
       uri: filePath,
-      type: 'audio/m4a',
-      name: `audio_${Date.now()}.m4a`,
-    } as any;
-    
-    formData.append('file', file);
+      name: "recording.m4a",
+      type: "audio/m4a"
+    } as any);
     
     const response = await fetch(`${API_BASE_URL}/transcribe`, {
       method: 'POST',

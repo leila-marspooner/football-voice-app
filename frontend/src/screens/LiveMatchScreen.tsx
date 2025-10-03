@@ -8,17 +8,27 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native';
-import { sendRawEvent, deleteEvent, ParsedEvent } from '../services/ApiClient';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { RootStackParamList } from '../navigation/AppNavigator';
+import { sendRawEvent, deleteEvent, ParsedEvent, API_BASE_URL } from '../services/ApiClient';
 import { audioRecorderService } from '../services/AudioRecorderService';
 import { transcribeAudio } from '../services/WhisperService';
 import { dbCacheService } from '../services/DbCacheService';
 import { syncService } from '../services/SyncService';
 
+type LiveMatchScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'LiveMatch'>;
+
 interface LiveMatchScreenProps {
-  matchId?: number;
+  navigation: LiveMatchScreenNavigationProp;
+  route?: {
+    params?: {
+      matchId?: number;
+    };
+  };
 }
 
-const LiveMatchScreen: React.FC<LiveMatchScreenProps> = ({ matchId = 1 }) => {
+const LiveMatchScreen: React.FC<LiveMatchScreenProps> = ({ navigation, route }) => {
+  const matchId = route?.params?.matchId || 1;
   const [isRecording, setIsRecording] = useState(false);
   const [events, setEvents] = useState<ParsedEvent[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -87,6 +97,17 @@ const LiveMatchScreen: React.FC<LiveMatchScreenProps> = ({ matchId = 1 }) => {
           [tempId]: transcript
         }));
         
+        // Add transcript as a temporary event in the feed
+        const transcriptEvent: ParsedEvent = {
+          id: tempId,
+          event_type: 'transcript',
+          player: null,
+          minute: null,
+          raw_text: transcript,
+          temp_id: tempId
+        };
+        setEvents(prevEvents => [...prevEvents, transcriptEvent]);
+        
         // Save to cache with synced=false
         const eventId = await dbCacheService.saveEvent(matchId, transcript, {
           event_type: 'transcribed_audio',
@@ -105,8 +126,12 @@ const LiveMatchScreen: React.FC<LiveMatchScreenProps> = ({ matchId = 1 }) => {
           await dbCacheService.markEventSynced(eventId);
           await dbCacheService.markAudioSynced(audioId);
           
-          // Add to events list
-          setEvents(prevEvents => [...prevEvents, parsedEvent]);
+          // Replace transcript event with parsed event
+          setEvents(prevEvents => 
+            prevEvents.map(event => 
+              event.temp_id === tempId ? parsedEvent : event
+            )
+          );
           
           // Remove from pending transcripts
           setPendingTranscripts(prev => {
@@ -126,8 +151,12 @@ const LiveMatchScreen: React.FC<LiveMatchScreenProps> = ({ matchId = 1 }) => {
         await updateSyncStats();
         
       } catch (error) {
-        Alert.alert('Error', 'Failed to process audio recording');
-        console.error('Error processing audio:', error);
+        console.error('❌ Full error details:', error);
+        console.error('❌ Error stack:', error instanceof Error ? error.stack : 'No stack trace available');
+        console.error('❌ Error message:', error instanceof Error ? error.message : 'Unknown error');
+        
+        const errorMessage = error instanceof Error ? error.message : 'Failed to process audio recording';
+        Alert.alert('Error', errorMessage);
       } finally {
         setIsLoading(false);
         setIsRecording(false);
@@ -139,8 +168,20 @@ const LiveMatchScreen: React.FC<LiveMatchScreenProps> = ({ matchId = 1 }) => {
         setIsRecording(true);
         console.log('🎤 Recording started');
       } catch (error) {
-        Alert.alert('Error', 'Failed to start recording');
         console.error('Error starting recording:', error);
+        
+        // Check if it's a microphone permission error
+        if (error instanceof Error && error.message === 'Microphone permission not granted') {
+          Alert.alert(
+            'Microphone Permission Required',
+            'This app needs access to your microphone to record match commentary.\n\nPlease enable microphone access in:\nSettings > Privacy & Security > Microphone > Football Voice App',
+            [
+              { text: 'OK', style: 'default' }
+            ]
+          );
+        } else {
+          Alert.alert('Error', 'Failed to start recording');
+        }
       }
     }
   };
@@ -208,6 +249,14 @@ const LiveMatchScreen: React.FC<LiveMatchScreenProps> = ({ matchId = 1 }) => {
     }
   };
 
+  const handleNavigateToPostMatchReview = () => {
+    navigation.navigate('PostMatchReview', { matchId });
+  };
+
+  const handleNavigateToStatsDashboard = () => {
+    navigation.navigate('StatsDashboard', { playerIds: [1, 2, 3] }); // Default player IDs
+  };
+
   const renderEvent = ({ item }: { item: ParsedEvent }) => (
     <View style={styles.eventItem}>
       <Text style={styles.eventType}>{item.event_type}</Text>
@@ -234,17 +283,45 @@ const LiveMatchScreen: React.FC<LiveMatchScreenProps> = ({ matchId = 1 }) => {
     <View style={styles.container}>
       <Text style={styles.title}>Live Match Recording</Text>
       
+      {/* Recording Indicator */}
+      {isRecording && (
+        <View style={styles.recordingIndicator}>
+          <View style={styles.recordingDot} />
+          <Text style={styles.recordingText}>Recording…</Text>
+        </View>
+      )}
+      
       <View style={styles.buttonContainer}>
-        <Button
-          title={isRecording ? "Stop Recording" : "Start Recording"}
-          onPress={handleStartStopRecording}
-          disabled={isLoading}
-        />
+        {isLoading ? (
+          <View style={styles.processingContainer}>
+            <ActivityIndicator size="small" color="#4CAF50" />
+            <Text style={styles.processingText}>Processing audio...</Text>
+          </View>
+        ) : (
+          <Button
+            title={isRecording ? "Stop Recording" : "Start Recording"}
+            onPress={handleStartStopRecording}
+            disabled={isLoading}
+          />
+        )}
         
         <Button
           title="Undo Last Event"
           onPress={handleUndo}
           disabled={events.length === 0}
+        />
+      </View>
+
+      {/* Navigation Buttons */}
+      <View style={styles.navigationContainer}>
+        <Button
+          title="Go to Post-Match Review"
+          onPress={handleNavigateToPostMatchReview}
+        />
+        
+        <Button
+          title="Go to Stats Dashboard"
+          onPress={handleNavigateToStatsDashboard}
         />
       </View>
 
@@ -296,6 +373,9 @@ const LiveMatchScreen: React.FC<LiveMatchScreenProps> = ({ matchId = 1 }) => {
           <Text style={styles.emptyText}>No events recorded yet</Text>
         }
       />
+      
+      {/* API Base URL Display */}
+      <Text style={styles.apiUrlText}>API: {API_BASE_URL}</Text>
     </View>
   );
 };
@@ -313,6 +393,11 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   buttonContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginBottom: 20,
+  },
+  navigationContainer: {
     flexDirection: 'row',
     justifyContent: 'space-around',
     marginBottom: 20,
@@ -383,6 +468,49 @@ const styles = StyleSheet.create({
     color: '#1976D2',
     marginBottom: 8,
     textAlign: 'center',
+  },
+  recordingIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFEBEE',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 16,
+    borderLeftWidth: 4,
+    borderLeftColor: '#F44336',
+  },
+  recordingDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: '#F44336',
+    marginRight: 8,
+  },
+  recordingText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#F44336',
+  },
+  processingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 8,
+    marginBottom: 10,
+  },
+  processingText: {
+    marginLeft: 8,
+    fontSize: 16,
+    color: '#666',
+  },
+  apiUrlText: {
+    fontSize: 12,
+    opacity: 0.7,
+    marginTop: 8,
   },
 });
 

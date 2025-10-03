@@ -1,6 +1,11 @@
 import React from "react";
-import LiveMatchScreen from "./src/screens/LiveMatchScreen";
+import { NavigationContainer } from '@react-navigation/native';
+import AppNavigator from "./src/navigation/AppNavigator";
 
 export default function App() {
-  return <LiveMatchScreen />;
+  return (
+    <NavigationContainer>
+      <AppNavigator />
+    </NavigationContainer>
+  );
 }

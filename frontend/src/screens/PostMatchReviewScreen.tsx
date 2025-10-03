@@ -10,13 +10,21 @@ import {
   TextInput,
   TouchableOpacity,
 } from 'react-native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { RouteProp } from '@react-navigation/native';
+import { RootStackParamList } from '../navigation/AppNavigator';
 import { getMatch, deleteEvent, updateEvent, ParsedEvent, Match } from '../services/ApiClient';
 
+type PostMatchReviewScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'PostMatchReview'>;
+type PostMatchReviewScreenRouteProp = RouteProp<RootStackParamList, 'PostMatchReview'>;
+
 interface PostMatchReviewScreenProps {
-  matchId: number;
+  navigation: PostMatchReviewScreenNavigationProp;
+  route: PostMatchReviewScreenRouteProp;
 }
 
-const PostMatchReviewScreen: React.FC<PostMatchReviewScreenProps> = ({ matchId }) => {
+const PostMatchReviewScreen: React.FC<PostMatchReviewScreenProps> = ({ navigation, route }) => {
+  const matchId = route.params.matchId;
   const [match, setMatch] = useState<Match | null>(null);
   const [events, setEvents] = useState<ParsedEvent[]>([]);
   const [isLoading, setIsLoading] = useState(true);

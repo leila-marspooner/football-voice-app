@@ -1,5 +1,5 @@
-import { Audio } from 'expo-av';
-import * as FileSystem from 'expo-file-system';
+import { Audio } from "expo-av";
+import * as FileSystem from "expo-file-system/legacy";
 
 export interface AudioRecorderState {
   isRecording: boolean;
@@ -49,10 +49,16 @@ class AudioRecorderService {
       console.log('🎤 Starting audio recording...');
       
       // Request permissions
+      console.log('🔐 Requesting microphone permissions...');
       const { status } = await Audio.requestPermissionsAsync();
+      console.log(`🔐 Microphone permission status: ${status}`);
+      
       if (status !== 'granted') {
+        console.error('❌ Microphone permission denied');
         throw new Error('Microphone permission not granted');
       }
+      
+      console.log('✅ Microphone permission granted');
 
       // Configure audio mode
       await Audio.setAudioModeAsync({
@@ -134,34 +140,37 @@ class AudioRecorderService {
       }
 
       // Create cache directory if it doesn't exist
-      const cacheDir = `${FileSystem.cacheDirectory}audio/`;
+      const cacheDir = FileSystem.cacheDirectory + "recordings/";
       await FileSystem.makeDirectoryAsync(cacheDir, { intermediates: true });
 
-      // Generate unique filename
-      const timestamp = Date.now();
-      const filename = `recording_${timestamp}.m4a`;
-      const cacheUri = `${cacheDir}${filename}`;
+      const newUri = cacheDir + `recording-${Date.now()}.m4a`;
 
-      // Move file to cache directory
-      await FileSystem.moveAsync({
-        from: originalUri,
-        to: cacheUri,
-      });
+      try {
+        await FileSystem.moveAsync({
+          from: originalUri!,
+          to: newUri,
+        });
+        
+        console.log(`✅ Audio file saved to: ${newUri}`);
+      } catch (moveError) {
+        console.error(`❌ Failed to move audio file:`, moveError);
+        throw moveError;
+      }
 
       this.state.isRecording = false;
-      this.state.audioUri = cacheUri;
+      this.state.audioUri = newUri;
       
       if (this.recordingInterval) {
         clearInterval(this.recordingInterval);
         this.recordingInterval = undefined;
       }
 
-      this.callbacks.onRecordingStopped?.(cacheUri);
+      this.callbacks.onRecordingStopped?.(newUri);
       
       console.log(`✅ Audio recording stopped - Duration: ${this.state.recordingDuration}s`);
-      console.log(`📁 Audio file saved: ${cacheUri}`);
+      console.log(`📁 Audio file saved: ${newUri}`);
       
-      return cacheUri;
+      return newUri;
     } catch (error) {
       this.state.isRecording = false;
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
